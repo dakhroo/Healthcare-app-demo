@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Rural Healthcare Facilities in Kasaragod</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Leaflet Routing Machine CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+  <style>
+    /* Reset and full height */
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+    }
+    /* Map container */
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    /* Info box container */
+    .info-box {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 350px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      z-index: 1000;
+      display: none;
+    }
+    .info-box h2 {
+      margin-top: 0;
+      font-size: 20px;
+      color: #333;
+    }
+    /* Close button style */
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 20px;
+      color: #999;
+      cursor: pointer;
+    }
+    .close-btn:hover {
+      color: #333;
+    }
+    /* Tab navigation */
+    .tabs {
+      display: flex;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    .tab-button {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+      background: #f9f9f9;
+      border: none;
+      outline: none;
+      transition: background 0.3s;
+      font-size: 14px;
+      color: #555;
+    }
+    .tab-button:hover, .tab-button.active {
+      background: #007BFF;
+      color: #fff;
+    }
+    .tab-content {
+      font-size: 14px;
+      color: #444;
+      min-height: 60px;
+      margin-bottom: 10px;
+    }
+    /* Buttons at the bottom of the info box */
+    .btn {
+      background-color: #007BFF;
+      color: #fff;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      font-size: 14px;
+    }
+    .btn:hover {
+      background-color: #0056b3;
+    }
+    /* Appointment Modal */
+    #appointmentModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+    }
+    #appointmentForm {
+      background: #fff;
+      width: 400px;
+      padding: 20px;
+      border-radius: 8px;
+      position: relative;
+    }
+    #appointmentForm h3 {
+      margin-top: 0;
+    }
+    #appointmentForm .step {
+      display: none;
+    }
+    #appointmentForm .step.active {
+      display: block;
+    }
+    #appointmentForm .nav-buttons {
+      margin-top: 15px;
+      text-align: right;
+    }
+    #appointmentForm .nav-buttons .btn {
+      margin-left: 10px;
+    }
+    #appointmentForm .close-modal {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 22px;
+      cursor: pointer;
+      color: #666;
+    }
+    #appointmentForm .close-modal:hover {
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  
+  <!-- Info box with tabs -->
+  <div class="info-box" id="infoBox">
+    <span class="close-btn" id="closeInfo">&times;</span>
+    <h2 id="facilityName">Facility Name</h2>
+    <div class="tabs">
+      <button class="tab-button active" data-tab="overview">Overview</button>
+      <button class="tab-button" data-tab="services">Services</button>
+      <button class="tab-button" data-tab="procedures">Procedures</button>
+      <button class="tab-button" data-tab="doctors">Doctors</button>
+      <button class="tab-button" data-tab="vaccines">Vaccines</button>
+      <button class="tab-button" data-tab="appointments">Appointments</button>
+    </div>
+    <div class="tab-content" id="tabContent">
+      <!-- Dynamic content will be loaded here -->
+    </div>
+    <div style="text-align: right;">
+      <button class="btn" id="openAppointment">Book Appointment</button>
+      <button class="btn" id="getDirections">Get Directions</button>
+    </div>
+  </div>
+
+  <!-- Appointment Modal -->
+  <div id="appointmentModal">
+    <div id="appointmentForm">
+      <span class="close-modal" id="closeAppointment">&times;</span>
+      <h3>Book Appointment at <span id="modalFacilityName"></span></h3>
+      <div id="appointmentSteps">
+        <!-- Step 1: Select Service -->
+        <div class="step active" data-step="1">
+          <p>Select a Service:</p>
+          <select id="selectService">
+            <option value="General Consultation">General Consultation</option>
+            <option value="Maternal Care">Maternal Care</option>
+            <option value="Emergency Treatment">Emergency Treatment</option>
+            <option value="Diagnostics">Diagnostics</option>
+            <option value="Vaccination">Vaccination</option>
+          </select>
+        </div>
+        <!-- Step 2: Select Procedure -->
+        <div class="step" data-step="2">
+          <p>Select a Procedure:</p>
+          <select id="selectProcedure">
+            <option value="Blood Test">Blood Test</option>
+            <option value="Ultrasound">Ultrasound</option>
+            <option value="X-Ray">X-Ray</option>
+            <option value="Physical Exam">Physical Exam</option>
+            <option value="Vaccination Administration">Vaccination Administration</option>
+          </select>
+        </div>
+        <!-- Step 3: Select Doctor -->
+        <div class="step" data-step="3">
+          <p>Select a Doctor:</p>
+          <select id="selectDoctor">
+            <!-- Options will be populated based on facility data -->
+          </select>
+        </div>
+        <!-- Step 4: Review and Confirm -->
+        <div class="step" data-step="4">
+          <p>Review your appointment details:</p>
+          <div id="reviewDetails"></div>
+        </div>
+      </div>
+      <div class="nav-buttons">
+        <button class="btn" id="prevStep" disabled>Back</button>
+        <button class="btn" id="nextStep">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Leaflet Routing Machine JS -->
+  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+  <!-- Optional: Leaflet Control Geocoder (for routing) -->
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+  <script>
+    // Facility data with updated (simulated) accurate coordinates and detailed info for tabs
+    const facilities = [
+      {
+        id: 1,
+        name: "Kasaragod Primary Health Center",
+        lat: 12.512345,
+        lng: 74.988765,
+        overview: "A primary facility offering general checkups and immunizations.",
+        services: "General consultations, preventive care, and basic diagnostics.",
+        procedures: "Minor procedures, blood tests, and routine examinations.",
+        doctors: "Dr. Nair, Dr. Mathew",
+        vaccines: "BCG, OPV, DPT, Hepatitis B",
+        appointments: "Online scheduling available via phone and web portal."
+      },
+      {
+        id: 2,
+        name: "Kasaragod Community Health Center",
+        lat: 12.518765,
+        lng: 74.982345,
+        overview: "A community-based center focused on maternal and child health.",
+        services: "Maternal care, child immunization, nutrition counseling.",
+        procedures: "Antenatal checkups, delivery assistance, pediatric screenings.",
+        doctors: "Dr. Varghese",
+        vaccines: "MMR, Polio, Measles",
+        appointments: "Appointments can be booked through the center's website."
+      },
+      {
+        id: 3,
+        name: "Kasaragod Rural Health Post",
+        lat: 12.506789,
+        lng: 74.995432,
+        overview: "A basic health post providing emergency care and first aid.",
+        services: "Emergency treatment, first aid, and basic diagnostics.",
+        procedures: "Wound care, stabilization procedures, emergency referrals.",
+        doctors: "Dr. Jose",
+        vaccines: "Tetanus, Influenza",
+        appointments: "Walk-ins accepted; limited appointment slots available."
+      },
+      {
+        id: 4,
+        name: "Central University of Kerala Health Centre Arravali",
+        lat: 12.522345,
+        lng: 74.993210,
+        overview: "A modern health center providing comprehensive healthcare services.",
+        services: "Diagnostic imaging, laboratory tests, primary care.",
+        procedures: "Minor surgeries, outpatient procedures, specialized diagnostics.",
+        doctors: "Dr. Nair, Dr. Rao",
+        vaccines: "Influenza, Hepatitis, COVID-19 boosters",
+        appointments: "24/7 online booking and emergency appointment services."
+      },
+      {
+        id: 5,
+        name: "Periye Community Health Centre",
+        lat: 12.517890,
+        lng: 75.007654,
+        overview: "A community health center focused on preventive and holistic care.",
+        services: "Preventive care, nutrition, chronic disease management.",
+        procedures: "Regular health screenings, diabetic checkups, cardiac evaluations.",
+        doctors: "Dr. Menon, Dr. Thomas",
+        vaccines: "HPV, Pneumococcal, MMR",
+        appointments: "Appointments available through a mobile app and hotline."
+      }
+    ];
+
+    let currentFacility = null;
+    let routeControl = null;
+
+    // Initialize the map centered on Kasaragod
+    const map = L.map('map').setView([12.5, 74.98], 13);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Function to populate info box tabs with facility data
+    function populateInfoBox(facility) {
+      document.getElementById('facilityName').innerText = facility.name;
+      setActiveTab('overview', facility.overview);
+    }
+
+    // Function to set active tab and update content
+    function setActiveTab(tab, content) {
+      document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelector(`.tab-button[data-tab="${tab}"]`).classList.add('active');
+      document.getElementById('tabContent').innerText = content;
+    }
+
+    // Add markers for each facility
+    facilities.forEach(facility => {
+      const marker = L.marker([facility.lat, facility.lng]).addTo(map);
+      marker.on('click', () => {
+        currentFacility = facility;
+        document.getElementById('infoBox').style.display = 'block';
+        populateInfoBox(facility);
+        // Clear any previous route
+        if (routeControl) {
+          map.removeControl(routeControl);
+          routeControl = null;
+        }
+      });
+    });
+
+    // Tab button event listeners
+    document.querySelectorAll('.tab-button').forEach(button => {
+      button.addEventListener('click', function() {
+        if (!currentFacility) return;
+        const tab = this.getAttribute('data-tab');
+        switch(tab) {
+          case 'overview':
+            setActiveTab(tab, currentFacility.overview);
+            break;
+          case 'services':
+            setActiveTab(tab, currentFacility.services);
+            break;
+          case 'procedures':
+            setActiveTab(tab, currentFacility.procedures);
+            break;
+          case 'doctors':
+            setActiveTab(tab, currentFacility.doctors);
+            break;
+          case 'vaccines':
+            setActiveTab(tab, currentFacility.vaccines);
+            break;
+          case 'appointments':
+            setActiveTab(tab, currentFacility.appointments);
+            break;
+          default:
+            setActiveTab('overview', currentFacility.overview);
+        }
+      });
+    });
+
+    // Handle "Get Directions" button click with routing functionality
+    document.getElementById('getDirections').addEventListener('click', function() {
+      if (navigator.geolocation && currentFacility) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+          const userLatLng = L.latLng(position.coords.latitude, position.coords.longitude);
+          const facilityLatLng = L.latLng(currentFacility.lat, currentFacility.lng);
+          if (routeControl) {
+            map.removeControl(routeControl);
+          }
+          routeControl = L.Routing.control({
+            waypoints: [
+              userLatLng,
+              facilityLatLng
+            ],
+            lineOptions: { styles: [{ color: 'blue', opacity: 0.6, weight: 4 }] },
+            routeWhileDragging: false,
+            geocoder: L.Control.Geocoder.nominatim()
+          }).addTo(map);
+        }, function(error) {
+          alert("Error getting your location: " + error.message);
+        });
+      } else {
+        alert("Geolocation is not supported by this browser.");
+      }
+    });
+
+    // Close the info box when clicking the close button
+    document.getElementById('closeInfo').addEventListener('click', function() {
+      document.getElementById('infoBox').style.display = 'none';
+      if (routeControl) {
+        map.removeControl(routeControl);
+        routeControl = null;
+      }
+    });
+
+    // Appointment Modal Handling
+    let currentStep = 1;
+    const totalSteps = 4;
+    const appointmentModal = document.getElementById('appointmentModal');
+
+    // Open appointment modal when "Book Appointment" is clicked from info box
+    document.getElementById('openAppointment').addEventListener('click', function() {
+      if (!currentFacility) return;
+      // Set modal facility name
+      document.getElementById('modalFacilityName').innerText = currentFacility.name;
+      // Populate doctor selection from current facility doctors (split by comma)
+      const doctorSelect = document.getElementById('selectDoctor');
+      doctorSelect.innerHTML = "";
+      currentFacility.doctors.split(',').forEach(doc => {
+        const option = document.createElement('option');
+        option.value = doc.trim();
+        option.text = doc.trim();
+        doctorSelect.appendChild(option);
+      });
+      // Reset form to step 1
+      currentStep = 1;
+      showStep(currentStep);
+      appointmentModal.style.display = 'flex';
+    });
+
+    // Close appointment modal
+    document.getElementById('closeAppointment').addEventListener('click', function() {
+      appointmentModal.style.display = 'none';
+    });
+
+    // Navigation buttons in appointment form
+    document.getElementById('prevStep').addEventListener('click', function() {
+      if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+      }
+    });
+
+    document.getElementById('nextStep').addEventListener('click', function() {
+      if (currentStep < totalSteps) {
+        currentStep++;
+        showStep(currentStep);
+      } else {
+        // On final step, submit appointment (simulate)
+        const service = document.getElementById('selectService').value;
+        const procedure = document.getElementById('selectProcedure').value;
+        const doctor = document.getElementById('selectDoctor').value;
+        alert(`Appointment confirmed at ${currentFacility.name}\nService: ${service}\nProcedure: ${procedure}\nDoctor: ${doctor}`);
+        appointmentModal.style.display = 'none';
+      }
+    });
+
+    // Function to show the current step in the appointment modal
+    function showStep(step) {
+      document.querySelectorAll('#appointmentForm .step').forEach(el => {
+        el.classList.remove('active');
+      });
+      document.querySelector(`#appointmentForm .step[data-step="${step}"]`).classList.add('active');
+      // Update navigation buttons
+      document.getElementById('prevStep').disabled = (step === 1);
+      document.getElementById('nextStep').innerText = (step === totalSteps ? "Confirm" : "Next");
+      // If step 4, show review summary
+      if (step === 4) {
+        const service = document.getElementById('selectService').value;
+        const procedure = document.getElementById('selectProcedure').value;
+        const doctor = document.getElementById('selectDoctor').value;
+        document.getElementById('reviewDetails').innerHTML = `<p><strong>Service:</strong> ${service}</p>
+                                                              <p><strong>Procedure:</strong> ${procedure}</p>
+                                                              <p><strong>Doctor:</strong> ${doctor}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
